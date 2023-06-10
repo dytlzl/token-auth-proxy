@@ -2,27 +2,39 @@ package main
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"net/url"
-	"sync"
+	"os"
+
+	"github.com/dytlzl/go-forward-proxy/pkg/common"
 )
 
-func handleTunneling(w http.ResponseWriter, req *http.Request) {
+func connectToProxy() (*tls.Conn, error) {
 	proxyAddr := "localhost:8888"
-	var err error
-	destConn, err := tls.Dial("tcp", proxyAddr, &tls.Config{
-		InsecureSkipVerify: true,
-   })
-	// destConn, err := net.DialTimeout("tcp", proxyAddr, 10*time.Second)
+	certPath := "./server.crt"
+	pem, err := os.ReadFile(certPath)
+	if err != nil {
+		return nil, err
+	}
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(pem)
+	return tls.Dial("tcp", proxyAddr, &tls.Config{
+		RootCAs: caCertPool,
+	})
+}
+
+func handleTunneling(w http.ResponseWriter, req *http.Request) {
+	destConn, err := connectToProxy()
 	if err != nil {
 		log.Println(err)
 		http.Error(w, err.Error(), http.StatusServiceUnavailable)
 		return
 	}
-	
+	req.Header.Add(common.ProxyAuthorizationHeaderName, "nekot")
 	err = req.Write(destConn)
 	if err != nil {
 		log.Println(err)
@@ -42,41 +54,24 @@ func handleTunneling(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, err.Error(), http.StatusServiceUnavailable)
 	}
 	defer clientConn.Close()
-	wg := sync.WaitGroup{}
-	wg.Add(2)
-	go transfer(destConn, clientConn, &wg)
-	go transfer(clientConn, destConn, &wg)
-	wg.Wait()
-}
-
-func transfer(dst io.Writer, src io.Reader, wg *sync.WaitGroup) error {
-	defer wg.Done()
-	_, err := io.Copy(dst, src)
-	if err != nil {
-		log.Println(err)
-	}
-	return nil
+	common.TransferBidirectionally(destConn, clientConn)
 }
 
 func handleHTTP(w http.ResponseWriter, req *http.Request) {
 	proxyAddr := "localhost:8888"
-	req.URL, _ = url.Parse(fmt.Sprintf("http://%s", proxyAddr))
+	req.URL, _ = url.Parse(fmt.Sprintf("https://%s", proxyAddr))
 	resp, err := http.DefaultTransport.RoundTrip(req)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusServiceUnavailable)
 		return
 	}
 	defer resp.Body.Close()
-	copyHeader(w.Header(), resp.Header)
+	common.CopyHeader(w.Header(), resp.Header)
 	w.WriteHeader(resp.StatusCode)
-	io.Copy(w, resp.Body)
-}
-
-func copyHeader(dst, src http.Header) {
-	for k, vv := range src {
-		for _, v := range vv {
-			dst.Add(k, v)
-		}
+	_, err = io.Copy(w, resp.Body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		return
 	}
 }
 
@@ -86,7 +81,6 @@ func main() {
 	server := &http.Server{
 		Addr: ":8989",
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			log.Println(r)
 			switch r.Method {
 			case http.MethodConnect:
 				handleTunneling(w, r)
