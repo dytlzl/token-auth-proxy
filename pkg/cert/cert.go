@@ -6,9 +6,8 @@ import (
 	"os"
 )
 
-func TLSClientConfig() (*tls.Config, error) {
-	certPath := "./server.crt"
-	pem, err := os.ReadFile(certPath)
+func TLSClientConfig(caCertPath string) (*tls.Config, error) {
+	pem, err := os.ReadFile(caCertPath)
 	if err != nil {
 		return nil, err
 	}

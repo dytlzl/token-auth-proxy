@@ -79,6 +79,7 @@ func (s sender) handleHTTP(w http.ResponseWriter, req *http.Request) {
 }
 
 func (s sender) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	log.Println(r)
 	switch r.Method {
 	case http.MethodConnect:
 		s.handleTunneling(w, r)

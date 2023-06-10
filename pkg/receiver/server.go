@@ -24,7 +24,7 @@ func New(config Config) receiver {
 }
 
 func (a receiver) connectToProxy() (*tls.Conn, error) {
-	tlsConf, err := cert.TLSClientConfig()
+	tlsConf, err := cert.TLSClientConfig(a.config.CACertPath)
 	if err != nil {
 		return nil, err
 	}
@@ -38,6 +38,7 @@ func (a receiver) handleTunneling(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, err.Error(), http.StatusServiceUnavailable)
 		return
 	}
+	defer destConn.Close()
 	auth.InjectToken(req, a.config.Token)
 	err = req.Write(destConn)
 	if err != nil {
@@ -45,7 +46,6 @@ func (a receiver) handleTunneling(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, err.Error(), http.StatusServiceUnavailable)
 		return
 	}
-	defer destConn.Close()
 	hijacker, ok := w.(http.Hijacker)
 	if !ok {
 		log.Println(err)
@@ -62,7 +62,7 @@ func (a receiver) handleTunneling(w http.ResponseWriter, req *http.Request) {
 }
 
 func (a receiver) handleHTTP(w http.ResponseWriter, req *http.Request) {
-	tlsConf, err := cert.TLSClientConfig()
+	tlsConf, err := cert.TLSClientConfig(a.config.CACertPath)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusServiceUnavailable)
 		return
@@ -90,6 +90,7 @@ func (a receiver) handleHTTP(w http.ResponseWriter, req *http.Request) {
 }
 
 func (a receiver) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	log.Println(r)
 	switch r.Method {
 	case http.MethodConnect:
 		a.handleTunneling(w, r)
