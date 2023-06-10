@@ -1,40 +1,44 @@
-package main
+package receiver
 
 import (
 	"crypto/tls"
-	"crypto/x509"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"net/url"
-	"os"
 
+	"github.com/dytlzl/go-forward-proxy/pkg/auth"
+	"github.com/dytlzl/go-forward-proxy/pkg/cert"
 	"github.com/dytlzl/go-forward-proxy/pkg/common"
 )
 
-func connectToProxy() (*tls.Conn, error) {
-	proxyAddr := "localhost:8888"
-	certPath := "./server.crt"
-	pem, err := os.ReadFile(certPath)
+type receiver struct {
+	config Config
+}
+
+func New(config Config) receiver {
+	return receiver{
+		config: config,
+	}
+}
+
+func (a receiver) connectToProxy() (*tls.Conn, error) {
+	tlsConf, err := cert.TLSClientConfig()
 	if err != nil {
 		return nil, err
 	}
-	caCertPool := x509.NewCertPool()
-	caCertPool.AppendCertsFromPEM(pem)
-	return tls.Dial("tcp", proxyAddr, &tls.Config{
-		RootCAs: caCertPool,
-	})
+	return tls.Dial("tcp", a.config.ProxyAddr, tlsConf)
 }
 
-func handleTunneling(w http.ResponseWriter, req *http.Request) {
-	destConn, err := connectToProxy()
+func (a receiver) handleTunneling(w http.ResponseWriter, req *http.Request) {
+	destConn, err := a.connectToProxy()
 	if err != nil {
 		log.Println(err)
 		http.Error(w, err.Error(), http.StatusServiceUnavailable)
 		return
 	}
-	req.Header.Add(common.ProxyAuthorizationHeaderName, "nekot")
+	auth.SetToken(req, a.config.Token)
 	err = req.Write(destConn)
 	if err != nil {
 		log.Println(err)
@@ -57,10 +61,20 @@ func handleTunneling(w http.ResponseWriter, req *http.Request) {
 	common.TransferBidirectionally(destConn, clientConn)
 }
 
-func handleHTTP(w http.ResponseWriter, req *http.Request) {
-	proxyAddr := "localhost:8888"
-	req.URL, _ = url.Parse(fmt.Sprintf("https://%s", proxyAddr))
-	resp, err := http.DefaultTransport.RoundTrip(req)
+func (a receiver) handleHTTP(w http.ResponseWriter, req *http.Request) {
+	tlsConf, err := cert.TLSClientConfig()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+	auth.SetToken(req, a.config.Token)
+	transport := &http.Transport{
+		Proxy: func(_ *http.Request) (*url.URL, error) {
+			return url.Parse(fmt.Sprintf("https://%s", a.config.ProxyAddr))
+		},
+		TLSClientConfig: tlsConf,
+	}
+	resp, err := transport.RoundTrip(req)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusServiceUnavailable)
 		return
@@ -75,22 +89,23 @@ func handleHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func main() {
-	addr := ":8989"
+func (a receiver) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodConnect:
+		a.handleTunneling(w, r)
+	default:
+		a.handleHTTP(w, r)
+	}
+}
+
+func (a receiver) Run() {
+	addr := fmt.Sprintf(":%s", a.config.Port)
 	log.Printf("Listening on %s\n", addr)
 	server := &http.Server{
-		Addr: ":8989",
-		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			switch r.Method {
-			case http.MethodConnect:
-				handleTunneling(w, r)
-			default:
-				handleHTTP(w, r)
-			}
-		}),
+		Addr:    addr,
+		Handler: a,
 		// Disable HTTP/2.
 		TLSNextProto: map[string]func(*http.Server, *tls.Conn, http.Handler){},
 	}
-
 	log.Fatal(server.ListenAndServe())
 }
