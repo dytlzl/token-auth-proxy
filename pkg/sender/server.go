@@ -14,17 +14,27 @@ import (
 )
 
 type sender struct {
-	config Config
+	config     Config
+	authorizer auth.Authorizer
 }
 
-func New(config Config) sender {
+func New(config Config, authorizer auth.Authorizer) sender {
 	return sender{
-		config: config,
+		config:     config,
+		authorizer: authorizer,
 	}
 }
 
+func (s sender) authorize(r *http.Request) error {
+	token, err := auth.ExtractToken(r)
+	if err != nil {
+		return err
+	}
+	return s.authorizer.Authorize(token)
+}
+
 func (s sender) handleTunneling(w http.ResponseWriter, r *http.Request) {
-	if err := auth.Authorize(r); err != nil {
+	if err := s.authorize(r); err != nil {
 		http.Error(w, err.Error(), http.StatusProxyAuthRequired)
 		return
 	}
@@ -49,7 +59,7 @@ func (s sender) handleTunneling(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s sender) handleHTTP(w http.ResponseWriter, req *http.Request) {
-	if err := auth.Authorize(req); err != nil {
+	if err := s.authorize(req); err != nil {
 		http.Error(w, err.Error(), http.StatusProxyAuthRequired)
 		return
 	}

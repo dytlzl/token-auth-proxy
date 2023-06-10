@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/dytlzl/go-forward-proxy/pkg/auth"
 	"github.com/dytlzl/go-forward-proxy/pkg/sender"
 )
 
@@ -10,5 +11,7 @@ func main() {
 		TLSCertPath: "./server.crt",
 		TLSKeyPath:  "./server.key",
 	}
-	sender.New(conf).Run()
+	sender.New(conf, auth.SingleTokenAuthorizer{
+		Token: "nekot",
+	}).Run()
 }

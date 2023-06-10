@@ -38,7 +38,7 @@ func (a receiver) handleTunneling(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, err.Error(), http.StatusServiceUnavailable)
 		return
 	}
-	auth.SetToken(req, a.config.Token)
+	auth.InjectToken(req, a.config.Token)
 	err = req.Write(destConn)
 	if err != nil {
 		log.Println(err)
@@ -67,7 +67,7 @@ func (a receiver) handleHTTP(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, err.Error(), http.StatusServiceUnavailable)
 		return
 	}
-	auth.SetToken(req, a.config.Token)
+	auth.InjectToken(req, a.config.Token)
 	transport := &http.Transport{
 		Proxy: func(_ *http.Request) (*url.URL, error) {
 			return url.Parse(fmt.Sprintf("https://%s", a.config.ProxyAddr))
