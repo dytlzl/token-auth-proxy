@@ -81,6 +81,5 @@ func main() {
 		// Disable HTTP/2.
 		TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler)),
 	}
-
-	log.Fatal(server.ListenAndServe())
+	log.Fatal(server.ListenAndServeTLS("./server.crt", "./server.key"))
 }

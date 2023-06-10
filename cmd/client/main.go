@@ -5,18 +5,25 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net"
 	"net/http"
 	"net/url"
 	"sync"
-	"time"
 )
 
 func handleTunneling(w http.ResponseWriter, req *http.Request) {
 	proxyAddr := "localhost:8888"
 	var err error
-	destConn, err := net.DialTimeout("tcp", proxyAddr, 10*time.Second)
-	req.Write(destConn)
+	destConn, err := tls.Dial("tcp", proxyAddr, &tls.Config{
+		InsecureSkipVerify: true,
+   })
+	// destConn, err := net.DialTimeout("tcp", proxyAddr, 10*time.Second)
+	if err != nil {
+		log.Println(err)
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+	
+	err = req.Write(destConn)
 	if err != nil {
 		log.Println(err)
 		http.Error(w, err.Error(), http.StatusServiceUnavailable)
