@@ -3,7 +3,6 @@ package sender
 import (
 	"crypto/tls"
 	"fmt"
-	"io"
 	"log"
 	"net"
 	"net/http"
@@ -63,19 +62,7 @@ func (s sender) handleHTTP(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, err.Error(), http.StatusProxyAuthRequired)
 		return
 	}
-	resp, err := http.DefaultTransport.RoundTrip(req)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusServiceUnavailable)
-		return
-	}
-	defer resp.Body.Close()
-	common.CopyHeader(w.Header(), resp.Header)
-	w.WriteHeader(resp.StatusCode)
-	_, err = io.Copy(w, resp.Body)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusServiceUnavailable)
-		return
-	}
+	common.TransferHTTPRequest(http.DefaultTransport, w, req)
 }
 
 func (s sender) ServeHTTP(w http.ResponseWriter, r *http.Request) {

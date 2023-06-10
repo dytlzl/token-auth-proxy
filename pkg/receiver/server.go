@@ -3,7 +3,6 @@ package receiver
 import (
 	"crypto/tls"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -74,19 +73,7 @@ func (a receiver) handleHTTP(w http.ResponseWriter, req *http.Request) {
 		},
 		TLSClientConfig: tlsConf,
 	}
-	resp, err := transport.RoundTrip(req)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusServiceUnavailable)
-		return
-	}
-	defer resp.Body.Close()
-	common.CopyHeader(w.Header(), resp.Header)
-	w.WriteHeader(resp.StatusCode)
-	_, err = io.Copy(w, resp.Body)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusServiceUnavailable)
-		return
-	}
+	common.TransferHTTPRequest(transport, w, req)
 }
 
 func (a receiver) ServeHTTP(w http.ResponseWriter, r *http.Request) {

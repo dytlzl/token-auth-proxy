@@ -6,10 +6,10 @@ import (
 
 func main() {
 	conf := receiver.Config{
-		Port:      "8989",
-		ProxyAddr: "localhost:8888",
+		Port:       "8989",
+		ProxyAddr:  "localhost:8888",
 		CACertPath: "./server.crt",
-		Token:     "nekot",
+		Token:      "nekot",
 	}
 	receiver.New(conf).Run()
 }
