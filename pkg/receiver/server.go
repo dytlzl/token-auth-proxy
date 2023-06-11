@@ -13,12 +13,18 @@ import (
 )
 
 type receiver struct {
-	config Config
+	config           Config
+	targetDomainsSet map[string]struct{}
 }
 
 func New(config Config) receiver {
+	targetDomainsSet := map[string]struct{}{}
+	for _, domain := range config.TargetDomains {
+		targetDomainsSet[domain] = struct{}{}
+	}
 	return receiver{
-		config: config,
+		config:           config,
+		targetDomainsSet: targetDomainsSet,
 	}
 }
 
@@ -78,11 +84,20 @@ func (a receiver) handleHTTP(w http.ResponseWriter, req *http.Request) {
 
 func (a receiver) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	log.Println(r)
-	switch r.Method {
-	case http.MethodConnect:
-		a.handleTunneling(w, r)
-	default:
-		a.handleHTTP(w, r)
+	if _, existing := a.targetDomainsSet[r.URL.Hostname()]; existing {
+		switch r.Method {
+		case http.MethodConnect:
+			a.handleTunneling(w, r)
+		default:
+			a.handleHTTP(w, r)
+		}
+	} else {
+		switch r.Method {
+		case http.MethodConnect:
+			common.HandleTunneling(w, r)
+		default:
+			common.TransferHTTPRequest(http.DefaultTransport, w, r)
+		}
 	}
 }
 

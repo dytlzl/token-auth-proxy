@@ -3,8 +3,10 @@ package common
 import (
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"sync"
+	"time"
 )
 
 func transfer(dst io.Writer, src io.Reader, wg *sync.WaitGroup) {
@@ -45,4 +47,25 @@ func TransferHTTPRequest(transport http.RoundTripper, w http.ResponseWriter, r *
 		http.Error(w, err.Error(), http.StatusServiceUnavailable)
 		return
 	}
+}
+
+func HandleTunneling(w http.ResponseWriter, r *http.Request) {
+	destConn, err := net.DialTimeout("tcp", r.Host, 10*time.Second)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+	defer destConn.Close()
+	w.WriteHeader(http.StatusOK)
+	hijacker, ok := w.(http.Hijacker)
+	if !ok {
+		http.Error(w, "failed to hijack", http.StatusInternalServerError)
+		return
+	}
+	clientConn, _, err := hijacker.Hijack()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+	}
+	defer clientConn.Close()
+	TransferBidirectionally(destConn, clientConn)
 }

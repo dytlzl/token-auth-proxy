@@ -4,9 +4,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"log"
-	"net"
 	"net/http"
-	"time"
 
 	"github.com/dytlzl/go-forward-proxy/pkg/auth"
 	"github.com/dytlzl/go-forward-proxy/pkg/common"
@@ -37,24 +35,7 @@ func (s sender) handleTunneling(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusProxyAuthRequired)
 		return
 	}
-	destConn, err := net.DialTimeout("tcp", r.Host, 10*time.Second)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusServiceUnavailable)
-		return
-	}
-	defer destConn.Close()
-	w.WriteHeader(http.StatusOK)
-	hijacker, ok := w.(http.Hijacker)
-	if !ok {
-		http.Error(w, "failed to hijack", http.StatusInternalServerError)
-		return
-	}
-	clientConn, _, err := hijacker.Hijack()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusServiceUnavailable)
-	}
-	defer clientConn.Close()
-	common.TransferBidirectionally(destConn, clientConn)
+	common.HandleTunneling(w, r)
 }
 
 func (s sender) handleHTTP(w http.ResponseWriter, req *http.Request) {
@@ -71,7 +52,7 @@ func (s sender) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case http.MethodConnect:
 		s.handleTunneling(w, r)
 	default:
-		switch r.URL.String() {
+		switch r.URL.Path {
 		case "/-/ready":
 			w.WriteHeader(http.StatusOK)
 			_, err := w.Write([]byte("OK"))
