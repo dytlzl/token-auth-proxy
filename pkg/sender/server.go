@@ -31,7 +31,7 @@ func (s sender) authorize(r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	return s.authorizer.Authorize(token)
+	return s.authorizer.Authorize(r.Context(), token)
 }
 
 func (s sender) handleTunneling(w http.ResponseWriter, r *http.Request) {

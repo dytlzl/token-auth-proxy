@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -24,14 +25,14 @@ func ExtractToken(r *http.Request) (string, error) {
 }
 
 type Authorizer interface {
-	Authorize(s string) error
+	Authorize(ctx context.Context, token string) error
 }
 
 type SingleTokenAuthorizer struct {
 	Token string
 }
 
-func (a SingleTokenAuthorizer) Authorize(token string) error {
+func (a SingleTokenAuthorizer) Authorize(ctx context.Context, token string) error {
 	if token != a.Token {
 		return errors.New("invalid token")
 	}
