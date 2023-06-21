@@ -1,4 +1,4 @@
-# go-foward-proxy
+# token-auth-proxy
 
 ## Generate a certificate for local testing purposes
 ```
