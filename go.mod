@@ -1,3 +1,3 @@
-module github.com/dytlzl/go-forward-proxy
+module github.com/dytlzl/token-auth-proxy
 
 go 1.18

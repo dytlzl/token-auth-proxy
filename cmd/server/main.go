@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/dytlzl/go-forward-proxy/pkg/auth"
-	"github.com/dytlzl/go-forward-proxy/pkg/sender"
+	"github.com/dytlzl/token-auth-proxy/pkg/auth"
+	"github.com/dytlzl/token-auth-proxy/pkg/sender"
 )
 
 func main() {

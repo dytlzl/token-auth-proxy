@@ -1,13 +1,17 @@
 package sender
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 
-	"github.com/dytlzl/go-forward-proxy/pkg/auth"
-	"github.com/dytlzl/go-forward-proxy/pkg/common"
+	"github.com/dytlzl/token-auth-proxy/pkg/auth"
+	"github.com/dytlzl/token-auth-proxy/pkg/common"
 )
 
 type sender struct {
@@ -69,10 +73,21 @@ func (s sender) Run() {
 	addr := fmt.Sprintf(":%s", s.config.Port)
 	log.Printf("Listening on %s\n", addr)
 	server := &http.Server{
-		Addr:    addr,
-		Handler: s,
-		// Disable HTTP/2.
+		Addr:         addr,
+		Handler:      s,
 		TLSNextProto: map[string]func(*http.Server, *tls.Conn, http.Handler){},
 	}
-	log.Fatal(server.ListenAndServeTLS(s.config.TLSCertPath, s.config.TLSKeyPath))
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, os.Interrupt, os.Kill)
+	defer stop()
+	go func() {
+		err := server.ListenAndServeTLS(s.config.TLSCertPath, s.config.TLSKeyPath)
+		if err != nil {
+			log.Fatalln(err)
+		}
+	}()
+	<-ctx.Done()
+	err := server.Shutdown(ctx)
+	if err != nil {
+		log.Fatalln(err)
+	}
 }
