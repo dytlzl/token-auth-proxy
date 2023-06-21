@@ -13,4 +13,4 @@ WORKDIR /app
 COPY --from=builder /out ./
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 
-ENTRYPOINT ["./receiver"]
+ENTRYPOINT ["./client"]
